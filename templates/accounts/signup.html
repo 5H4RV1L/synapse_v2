@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<h2>Create Account</h2>
+
+{% if messages %}
+    {% for message in messages %}
+        <p style="color:red;">{{ message }}</p>
+    {% endfor %}
+{% endif %}
+
+<form method="post">
+    {% csrf_token %}
+
+    <label>Username</label>
+    <input type="text" name="username" maxlength="12" required>
+
+    <label>Email</label>
+    <input type="email" name="email" required>
+
+    <label>Password</label>
+    <div style="position:relative;">
+        <input type="password" name="password" id="signup_password" minlength="8" maxlength="16" required>
+        <span onclick="togglePassword('signup_password')"
+              style="position:absolute; right:10px; top:8px; cursor:pointer; color:black;">
+            👁
+        </span>
+    </div>
+
+    <label>Confirm Password</label>
+    <div style="position:relative;">
+        <input type="password" name="confirm_password" id="signup_confirm_password" minlength="4" maxlength="16" required>
+        <span onclick="togglePassword('signup_confirm_password')"
+              style="position:absolute; right:10px; top:8px; cursor:pointer; color:black;">
+            👁
+        </span>
+    </div>
+
+    <br><br>
+    <button type="submit">Create Account</button>
+</form>
+
+<script>
+    function togglePassword(fieldId) {
+        const input = document.getElementById(fieldId);
+        if (input.type === "password") {
+            input.type = "text";
+        } else {
+            input.type = "password";
+        }
+    }
+</script>
+
+{% endblock %}

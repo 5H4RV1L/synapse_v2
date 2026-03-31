@@ -1,0 +1,291 @@
+{% extends 'base.html' %}
+{% load tz %}
+
+{% block content %}
+
+{% load static %}
+
+{% if request.user == profile_user %}
+<div style="display:flex; align-items:center; justify-content:space-between; margin:0 0 16px 0;">
+
+    <form id="theme-toggle-form" method="post" action="{% url 'change_theme' %}" style="margin:0;">
+        {% csrf_token %}
+        <input type="hidden" name="theme" id="theme-input" value="{{ request.user.theme_preference }}">
+        <div class="theme-toggle-container" style="margin:0;">
+            <span class="theme-toggle-label" style="font-size:9px;">Cyberpunk<br> Dark</span>
+            <label class="toggle-switch" title="Switch theme">
+                <input type="checkbox" id="theme-checkbox"
+                    {% if request.user.theme_preference == 'neo-brutalism' %}checked{% endif %}
+                    onchange="submitThemeChange(this)">
+                <span class="toggle-slider"></span>
+            </label>
+            <span class="theme-toggle-label" style="font-size:9px;">Neo<br> Brutalism</span>
+        </div>
+    </form>
+
+    {% if request.user.username == 'Joyce' %}
+    <form id="joyce-toggle-form" method="post" action="{% url 'change_theme' %}" style="margin:0;">
+        {% csrf_token %}
+        <input type="hidden" name="theme" id="joyce-theme-input" value="{{ request.user.theme_preference }}">
+        <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:9px; font-weight:600; color: inherit; text-transform:uppercase; letter-spacing:0.5px; margin-top:4px;">
+            <input type="radio" id="joyce-radio"
+                name="joyce_mode"
+                {% if request.user.theme_preference == 'joyce' %}checked{% endif %}
+                onchange="submitJoyceMode(this)"
+                style="width:12px; height:12px; cursor:pointer; accent-color:#C77DFF;">
+            🌸 Joyce
+        </label>
+    </form>
+    {% endif %}
+
+    <form method="post" action="{% url 'logout' %}" style="margin:0;">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger" style="padding:4px 10px; font-size:11px; letter-spacing:0.5px; clip-path:none;">
+            Logout
+        </button>
+    </form>
+
+</div>
+{% endif %}
+
+<div style="display:flex; align-items:center; gap:20px;">
+
+    <div>
+        {% if profile_user.profile_photo %}
+            <img src="{{ profile_user.profile_photo.url }}"
+                 class="profile-photo">
+        {% else %}
+            <img src="{% static 'images/default_pfp.png' %}"
+                 class="profile-photo">
+        {% endif %}
+    </div>
+
+    <div style="flex:1;">
+
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+            <h2 style="margin:0;">{{ profile_user.username }}</h2>
+
+
+        </div>
+
+        {% if request.user == profile_user %}
+        <button onclick="toggleFriendList()" class="btn" style="padding:4px 10px; font-size:15px; letter-spacing:0.5px; clip-path:none;">
+                Friends: {{ profile_user.friends_user1.count|add:profile_user.friends_user2.count }}
+        </button>
+        {% endif %}
+
+        {% if request.user == profile_user %}
+            <form id="profile-photo-form"
+                  method="post"
+                  action="{% url 'change_profile_photo' %}"
+                  enctype="multipart/form-data">
+                {% csrf_token %}
+                <label for="id_profile_photo" class="file-input-label" style="padding:4px 10px; font-size:15px; letter-spacing:0.5px; clip-path:none;">Choose Photo</label>
+                <input type="file" id="id_profile_photo" name="profile_photo" accept="image/jpeg,image/png" class="file-input">
+            </form>
+
+        {% endif %}
+    </div>
+
+</div>
+
+<hr>
+
+<script>
+function toggleFriendList() {
+    const popup = document.getElementById("friendListPopup");
+    popup.classList.toggle("active");
+}
+
+document.addEventListener("click", function(event) {
+    const popup = document.getElementById("friendListPopup");
+    const button = document.querySelector("button[onclick='toggleFriendList()']");
+
+    if (!popup.contains(event.target) && !button.contains(event.target)) {
+        popup.classList.remove("active");
+    }
+});
+</script>
+
+{% if request.user != profile_user %}
+
+    {% if is_friend %}
+        <p>You are friends.</p>
+
+    {% elif received_request %}
+        <div style="display:flex; gap:10px;">
+            <form method="post"
+                  action="{% url 'accept_friend_request' received_request.id %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-success">
+                    Accept
+                </button>
+            </form>
+        
+            <form method="post"
+                  action="{% url 'decline_friend_request' received_request.id %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger">
+                    Decline
+                </button>
+            </form>
+        </div>
+
+    {% elif sent_request %}
+        <p>Friend request sent.</p>
+
+    {% else %}
+        <form method="post"
+              action="{% url 'send_friend_request' profile_user.username %}">
+            {% csrf_token %}
+            <button type="submit" class="btn">
+                Add Friend
+            </button>
+        </form>
+
+    {% endif %}
+    
+    <hr>
+    
+    {% endif %}
+    
+    <h3>Posts</h3>
+
+    {% if request.user != profile_user and not is_friend %}
+        <p>This user's posts are visible to friends only.</p>
+    {% endif %}
+    
+    {% for post in posts %}
+    <div class="post">
+        <div class="post-author">
+            <a href="/profile/{{ post.author.username }}/">
+                {{ post.author.username }}
+            </a>
+        </div>
+        <div class="post-content">
+            {% if post.image %}
+            <img src="{{ post.image.url }}"
+                style="max-width:100%; border-radius:10px;">
+            {% endif %}
+            {{ post.content }}</div>
+        <div class="post-meta">
+            <div class="post-timestamp">{{ post.created_at|localtime }}</div>
+            <div class="post-score">Score: {{ post.score }}</div>
+        </div>
+        <div class="post-actions">
+            <a href="{% url 'vote_post' post.id 'up' %}" class="btn-vote btn-vote-up">⬆</a>
+            <a href="{% url 'vote_post' post.id 'down' %}" class="btn-vote btn-vote-down">⬇</a>
+            {% if post.author == request.user %}
+            <form method="post" action="{% url 'delete_post' post.id %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" style="background:none; border:none; color:red; cursor:pointer;">
+                    Delete
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+{% empty %}
+    <p>No posts yet.</p>
+{% endfor %}
+
+<script>
+    document.getElementById('id_profile_photo').addEventListener('change', function() {
+        document.getElementById('profile-photo-form').submit();
+    });
+
+    function submitThemeChange(checkbox) {
+        const themeInput = document.getElementById('theme-input');
+        const joyceRadio = document.getElementById('joyce-radio');
+        if (joyceRadio && joyceRadio.checked) {
+            joyceRadio.checked = false;
+        }
+        themeInput.value = checkbox.checked ? 'neo-brutalism' : 'dark';
+        document.getElementById('theme-toggle-form').submit();
+    }
+
+    function submitJoyceMode(radio) {
+        const joyceThemeInput = document.getElementById('joyce-theme-input');
+        const themeCheckbox = document.getElementById('theme-checkbox');
+        if (radio.checked) {
+            joyceThemeInput.value = 'joyce';
+        } else {
+            joyceThemeInput.value = themeCheckbox && themeCheckbox.checked ? 'neo-brutalism' : 'dark';
+        }
+        document.getElementById('joyce-toggle-form').submit();
+    }
+</script>
+
+{% if request.user == profile_user %}
+<div id="friendListPopup" class="friend-popup">
+
+    <div class="friend-popup-content">
+        <h3>Your Friends</h3>
+
+        <div class="friend-list-scroll">
+            {% for friend in friends %}
+                <a href="/profile/{{ friend.username }}/" class="friend-row">
+
+                    {% if friend.profile_photo %}
+                        <img src="{{ friend.profile_photo.url }}"
+                             class="friend-row-photo">
+                    {% else %}
+                        <img src="{% static 'images/default_pfp.png' %}"
+                             class="friend-row-photo">
+                    {% endif %}
+
+                    <span class="friend-row-name">
+                        {{ friend.username }}
+                    </span>
+
+                </a>
+            {% empty %}
+                <p>No friends yet.</p>
+            {% endfor %}
+        </div>
+
+    </div>
+
+</div>
+{% endif %}
+
+
+<script>
+(function() {
+    if (!document.body.classList.contains('neo-brutalism')) return;
+
+    const palette = [
+        { bg: '#FFED47', text: '#0A0A0A' },
+        { bg: '#FF6B6B', text: '#0A0A0A' },
+        { bg: '#4ECDC4', text: '#0A0A0A' },
+        { bg: '#A8E6CF', text: '#0A0A0A' },
+        { bg: '#FFB3BA', text: '#0A0A0A' },
+        { bg: '#C7CEEA', text: '#0A0A0A' },
+        { bg: '#FF9F43', text: '#0A0A0A' },
+        { bg: '#A29BFE', text: '#0A0A0A' },
+        { bg: '#FD79A8', text: '#0A0A0A' },
+        { bg: '#55EFC4', text: '#0A0A0A' },
+    ];
+
+    document.querySelectorAll('.post').forEach(function(post, i) {
+        const c = palette[i % palette.length];
+        post.style.background = c.bg;
+
+        const content = post.querySelector('.post-content');
+        const timestamp = post.querySelector('.post-timestamp');
+        const score = post.querySelector('.post-score');
+        const meta = post.querySelector('.post-meta');
+        const author = post.querySelector('.post-author a');
+        const replyLink = post.querySelector('.post-actions a:not(.btn-vote)');
+
+        if (content) content.style.color = c.text;
+        if (author) { author.style.color = c.text; author.style.textDecorationColor = c.text; }
+        if (timestamp) timestamp.style.color = c.text + 'AA';
+        if (score) { score.style.background = '#0A0A0A'; score.style.color = c.bg; score.style.borderColor = '#0A0A0A'; }
+        if (meta) meta.style.borderTopColor = '#0A0A0A';
+        if (replyLink) { replyLink.style.background = '#0A0A0A'; replyLink.style.color = c.bg; replyLink.style.border = '2px solid #0A0A0A'; }
+    });
+})();
+</script>
+
+{% endblock %}

@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+{% load tz %}
+
+{% block content %}
+
+<h2>Feed</h2>
+
+{% for post in posts %}
+    <div class="post" id="post-{{ post.id }}">
+
+        {% if post.parent %}
+            <div class="post-parent" style="font-size:0.9em; margin-bottom:5px;">
+                <a href="#post-{{ post.parent.id }}">
+                    {{ post.author.username }} replied to {{ post.parent.author.username }}
+                </a>
+            </div>
+        {% endif %}
+        <div class="post-author">
+            <a href="/profile/{{ post.author.username }}/">
+                {{ post.author.username }}
+            </a>
+        </div>
+        <div class="post-content">
+            {% if post.image %}
+                <div style="margin: 10px 0;">
+                    <img src="{{ post.image.url }}"
+                         style="max-width:100%; border-radius:10px;">
+                </div>
+            {% endif %}
+            <p>{{ post.content|linebreaksbr }}</p>
+        </div>
+        <div class="post-meta">
+            <div class="post-timestamp">{{ post.created_at|localtime }}</div>
+            <div class="post-score">Score: {{ post.score }}</div>
+        </div>
+        <div class="post-actions">
+            <a href="{% url 'vote_post' post.id 'up' %}" class="btn-vote btn-vote-up">⬆</a>
+            <a href="{% url 'vote_post' post.id 'down' %}" class="btn-vote btn-vote-down">⬇</a>
+            <a href="{% url 'create_post_page' %}?reply_to={{ post.id }}">
+                Reply
+            </a>
+            
+        </div>
+    </div>
+{% empty %}
+    <p>No posts yet.</p>
+{% endfor %}
+
+
+<script>
+(function() {
+    if (!document.body.classList.contains('neo-brutalism')) return;
+
+    const palette = [
+        { bg: '#FFED47', text: '#0A0A0A' },
+        { bg: '#FF6B6B', text: '#0A0A0A' },
+        { bg: '#4ECDC4', text: '#0A0A0A' },
+        { bg: '#A8E6CF', text: '#0A0A0A' },
+        { bg: '#FFB3BA', text: '#0A0A0A' },
+        { bg: '#C7CEEA', text: '#0A0A0A' },
+        { bg: '#FF9F43', text: '#0A0A0A' },
+        { bg: '#A29BFE', text: '#0A0A0A' },
+        { bg: '#FD79A8', text: '#0A0A0A' },
+        { bg: '#55EFC4', text: '#0A0A0A' },
+    ];
+
+    document.querySelectorAll('.post').forEach(function(post, i) {
+        const c = palette[i % palette.length];
+        post.style.background = c.bg;
+
+        const content = post.querySelector('.post-content');
+        const timestamp = post.querySelector('.post-timestamp');
+        const score = post.querySelector('.post-score');
+        const meta = post.querySelector('.post-meta');
+        const author = post.querySelector('.post-author a');
+        const replyLink = post.querySelector('.post-actions a:not(.btn-vote)');
+
+        if (content) content.style.color = c.text;
+        if (author) { author.style.color = c.text; author.style.textDecorationColor = c.text; }
+        if (timestamp) timestamp.style.color = c.text + 'AA';
+        if (score) { score.style.background = '#0A0A0A'; score.style.color = c.bg; score.style.borderColor = '#0A0A0A'; }
+        if (meta) meta.style.borderTopColor = '#0A0A0A';
+        if (replyLink) { replyLink.style.background = '#0A0A0A'; replyLink.style.color = c.bg; replyLink.style.border = '2px solid #0A0A0A'; }
+    });
+})();
+</script>
+
+{% endblock %}

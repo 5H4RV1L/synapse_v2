@@ -1,0 +1,296 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<style>
+@media (max-width: 768px) {
+
+    /* ── Header buttons: same size, smaller ── */
+    .cr-header-actions {
+        display: flex;
+        flex-direction: row;
+        gap: 6px;
+        align-items: center;
+        flex-shrink: 0;
+    }
+
+    .cr-btn-invite,
+    .cr-btn-leave {
+        font-size: 11px !important;
+        padding: 5px 10px !important;
+        height: 28px !important;
+        line-height: 1 !important;
+        box-sizing: border-box !important;
+        white-space: nowrap;
+        min-width: unset !important;
+        width: auto !important;
+    }
+
+    /* ── Layout: stack vertically, no side-by-side ── */
+    .cr-layout {
+        display: flex !important;
+        flex-direction: column !important;
+        width: 100% !important;
+        box-sizing: border-box;
+    }
+
+    /* ── Chat area: full width ── */
+    .cr-chat-area {
+        width: 100% !important;
+        box-sizing: border-box !important;
+        flex: unset !important;
+        min-width: unset !important;
+        max-width: unset !important;
+        font-size: 14px !important;
+    }
+
+    #cr-chat-box {
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    /* ── Message form: compact, equal height for input + button ── */
+    .cr-msg-form {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        gap: 6px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    .cr-msg-input {
+        flex: 1 !important;
+        height: 34px !important;
+        font-size: 13px !important;
+        padding: 0 10px !important;
+        box-sizing: border-box !important;
+        min-width: 0 !important;
+    }
+
+    .cr-btn-send {
+        height: 34px !important;
+        font-size: 12px !important;
+        padding: 0 14px !important;
+        box-sizing: border-box !important;
+        flex-shrink: 0 !important;
+        line-height: 1 !important;
+    }
+
+    /* ── Members: full width, stacked below chat ── */
+    .cr-members {
+        width: 100% !important;
+        box-sizing: border-box !important;
+        flex-shrink: 0 !important;
+        min-width: unset !important;
+        max-width: unset !important;
+    }
+
+    .cr-member-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+}
+</style>
+
+<div id="chatroom-view" data-room-id="{{ room.id }}">
+
+    <div class="cr-header">
+        <div>
+            <h2 class="cr-title">{{ room.name }}</h2>
+            <div class="cr-room-meta">
+                {{ members.count }} member{{ members.count|pluralize }} &bull;
+                <span class="cr-timer-inline" id="room-timer">⏱ <span id="room-timer-val"></span></span>
+                {% if is_creator %}<span class="cr-badge">Owner</span>{% endif %}
+            </div>
+        </div> 
+        <div class="cr-header-actions">
+            {% if friends_to_invite %}
+            <button class="cr-btn cr-btn-invite" id="cr-invite-btn">+ Invite</button>
+            {% endif %}
+            <button class="cr-btn cr-btn-leave" id="cr-leave-btn">Leave</button>
+        </div>
+    </div>
+
+    <div class="cr-layout">
+
+        <!-- Message area -->
+        <div class="cr-chat-area">
+            <div id="cr-chat-box" class="cr-chat-box"></div>
+            <form id="cr-msg-form" class="cr-msg-form">
+                {% csrf_token %}
+                <input type="text" id="cr-msg-input" class="cr-msg-input" placeholder="Type a message…"
+                    autocomplete="off" maxlength="500">
+                <button type="submit" class="cr-btn cr-btn-send">Send</button>
+            </form>
+        </div>
+
+        <!-- Members sidebar — stacks below chat on mobile -->
+        <div class="cr-members">
+            <div class="cr-section-title">Members</div>
+            {% for m in members %}
+            <div class="cr-member-item">
+                <span class="cr-member-dot"></span>
+                <span>{{ m.user.username }}</span>
+                {% if m.user == room.creator %}<span class="cr-badge cr-badge-sm">Owner</span>{% endif %}
+            </div>
+            {% endfor %}
+        </div>
+
+    </div>
+
+</div>
+
+<!-- Invite Modal -->
+<div id="cr-invite-overlay" class="cr-modal-overlay" style="display:none;">
+    <div class="cr-modal">
+        <div class="cr-modal-title">Invite a Friend</div>
+        <div id="cr-invite-error" class="cr-error" style="display:none;"></div>
+        <div id="cr-invite-success" class="cr-success" style="display:none;"></div>
+        <div class="cr-invite-list">
+            {% for friend in friends_to_invite %}
+            <div class="cr-invite-row">
+                <span>{{ friend.username }}</span>
+                <button class="cr-btn cr-btn-invite-send" data-username="{{ friend.username }}">Invite</button>
+            </div>
+            {% empty %}
+            <div class="cr-empty">All your friends are already in this room.</div>
+            {% endfor %}
+        </div>
+        <div class="cr-modal-actions">
+            <button class="cr-btn cr-btn-ghost" id="cr-invite-close">Close</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const ROOM_ID = Number("{{ room.id }}");
+    const CSRF = "{{ csrf_token }}";
+    const IS_NEO = document.body.classList.contains('neo-brutalism');
+
+    // ── Timer ──
+    let secondsLeft = Number("{{ seconds_remaining }}");
+    const timerVal = document.getElementById('room-timer-val');
+
+    function formatTime(s) {
+        const m = Math.floor(s / 60);
+        const sec = s % 60;
+        return `${m}:${String(sec).padStart(2, '0')}`;
+    }
+    timerVal.textContent = formatTime(secondsLeft);
+
+    const timerIv = setInterval(() => {
+        secondsLeft--;
+        if (secondsLeft <= 0) {
+            clearInterval(timerIv);
+            timerVal.textContent = 'expired';
+            document.getElementById('cr-msg-form').style.display = 'none';
+            setTimeout(() => window.location.href = '/chat/', 2000);
+        } else {
+            timerVal.textContent = formatTime(secondsLeft);
+        }
+    }, 1000);
+
+    // ── Messages ──
+    function formatMessage(msg) {
+        if (IS_NEO) {
+            return `<div style="padding:8px 10px;margin-bottom:6px;border:2px solid #0A0A0A;border-radius:0;background:#FAFAF5;color:#0A0A0A;font-family:'JetBrains Mono',monospace;">
+            <strong style="color:#FF4757;">${msg.user}</strong>
+            <span style="color:rgba(10,10,10,0.45);font-size:11px;margin:0 6px;">${msg.time}</span>
+            <span>${msg.content}</span>
+        </div>`;
+        }
+        return `<div style="padding:8px 10px;margin-bottom:6px;border-left:2px solid rgba(0,245,255,0.3);background:rgba(0,245,255,0.03);font-family:'JetBrains Mono',monospace;font-size:15px;">
+        <strong style="color:#FF00A0;text-shadow:0 0 6px rgba(255,0,160,0.5);">${msg.user}</strong>
+        <span style="color:rgba(0,245,255,0.35);font-size:11px;margin:0 6px;">${msg.time}</span>
+        <span style="color:#39FF14;text-shadow:0 0 4px rgba(57,255,20,0.3);">${msg.content}</span>
+    </div>`;
+    }
+
+    let lastMsgCount = 0;
+
+    function loadMessages() {
+        fetch(`/chat/room/${ROOM_ID}/messages/`)
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) { window.location.href = '/chat/'; return; }
+                const box = document.getElementById('cr-chat-box');
+                if (data.messages.length !== lastMsgCount) {
+                    lastMsgCount = data.messages.length;
+                    const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
+                    box.innerHTML = '';
+                    data.messages.forEach(msg => box.innerHTML += formatMessage(msg));
+                    if (atBottom) box.scrollTop = box.scrollHeight;
+                }
+                secondsLeft = data.seconds_remaining;
+            });
+    }
+
+    setInterval(loadMessages, 2000);
+    loadMessages();
+
+    // ── Send message ──
+    document.getElementById('cr-msg-form').addEventListener('submit', e => {
+        e.preventDefault();
+        const input = document.getElementById('cr-msg-input');
+        const content = input.value.trim();
+        if (!content) return;
+
+        fetch(`/chat/room/${ROOM_ID}/send/`, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `content=${encodeURIComponent(content)}`
+        }).then(() => { input.value = ''; loadMessages(); });
+    });
+
+    // ── Leave ──
+    document.getElementById('cr-leave-btn').addEventListener('click', () => {
+        if (!confirm('Leave this room?')) return;
+        fetch(`/chat/room/${ROOM_ID}/leave/`, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': CSRF }
+        }).then(() => window.location.href = '/chat/');
+    });
+
+    // ── Invite ──
+    const inviteBtn = document.getElementById('cr-invite-btn');
+    const inviteOverlay = document.getElementById('cr-invite-overlay');
+    const inviteClose = document.getElementById('cr-invite-close');
+    const inviteErr = document.getElementById('cr-invite-error');
+    const inviteOk = document.getElementById('cr-invite-success');
+
+    if (inviteBtn) {
+        inviteBtn.addEventListener('click', () => { inviteOverlay.style.display = 'flex'; });
+    }
+    if (inviteClose) {
+        inviteClose.addEventListener('click', () => { inviteOverlay.style.display = 'none'; });
+    }
+
+    document.querySelectorAll('.cr-btn-invite-send').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const username = btn.dataset.username;
+            inviteErr.style.display = 'none';
+            inviteOk.style.display = 'none';
+
+            fetch(`/chat/room/${ROOM_ID}/invite/`, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `username=${encodeURIComponent(username)}`
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.error) {
+                        inviteErr.textContent = data.error;
+                        inviteErr.style.display = 'block';
+                    } else {
+                        inviteOk.textContent = `Invite sent to ${username}!`;
+                        inviteOk.style.display = 'block';
+                        btn.disabled = true;
+                        btn.textContent = 'Sent';
+                    }
+                });
+        });
+    });
+</script>
+
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<div class="login-container">
+    <div class="login-card">
+        <h1>Login</h1>
+
+        <form method="post">
+            {% csrf_token %}
+
+            <label>Username</label>
+            {{ form.username }}
+
+            <label>Password</label>
+            <div style="position:relative;">
+                {{ form.password }}
+                <span onclick="togglePassword('id_password')"
+                      style="position:absolute; right:10px; top:8px; cursor:pointer; color:black;">
+                    👁
+                </span>
+            </div>
+        
+            <br><br>
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:16px;">
+                <button type="submit">Login</button>
+                <a href="{% url 'forgot_password' %}" style="white-space:nowrap; font-size:0.875rem;">Forgot Password?</a>
+            </div>
+        </form>
+        
+        <p>Don't have an account?</p>
+        <a href="{% url 'signup' %}" class="btn-signup">Create Account</a>
+    </div>
+</div>
+
+<script>
+    function togglePassword(fieldId) {
+        const input = document.getElementById(fieldId);
+        if (input.type === "password") {
+            input.type = "text";
+        } else {
+            input.type = "password";
+        }
+    }
+</script>
+
+{% endblock %}

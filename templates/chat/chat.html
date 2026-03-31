@@ -1,0 +1,232 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div id="chatrooms-lobby">
+
+    <div class="cr-header">
+        <h2 class="cr-title">💬 Chatrooms</h2>
+        <div class="cr-stats">
+            <span>Created: <strong id="cr-created-count">{{ created_count }}</strong>/{{ max_created }}</span>
+            <span>Joined: <strong id="cr-joined-count">{{ joined_count }}</strong>/{{ max_joined }}</span>
+        </div>
+    </div>
+
+    <!-- Search bar -->
+    <div class="cr-search-row">
+        <input type="text" id="cr-search-input" class="cr-search" placeholder="Search chatrooms by name…"
+            autocomplete="off">
+        <button class="cr-btn cr-btn-primary" id="cr-create-btn">+ Create Room</button>
+    </div>
+
+    <!-- Search results -->
+    <div id="cr-search-results" class="cr-section" style="display:none;">
+        <div class="cr-section-title">Search Results</div>
+        <div id="cr-search-list"></div>
+    </div>
+
+    <!-- My rooms -->
+    <div class="cr-section">
+        <div class="cr-section-title">My Rooms</div>
+        <div id="cr-my-rooms">
+            {% if rooms_data %}
+            {% for rd in rooms_data %}
+            <div class="cr-room-card" id="cr-room-{{ rd.room.id }}" data-room-id="{{ rd.room.id }}"
+                data-expires="{{ rd.seconds_remaining }}">
+                <div class="cr-room-info">
+                    <span class="cr-room-name">{{ rd.room.name }}</span>
+                    <span class="cr-room-meta">{{ rd.room.members.count }} member{{ rd.room.members.count|pluralize
+                        }}</span>
+                </div>
+                <div class="cr-room-right">
+                    <span class="cr-timer" id="timer-{{ rd.room.id }}">⏱ <span class="cr-timer-val">{{
+                            rd.seconds_remaining }}</span>s</span>
+                    <a href="{% url 'chatroom_detail' rd.room.id %}" class="cr-btn cr-btn-enter">Enter</a>
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="cr-empty">You haven't joined any chatrooms yet.</div>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+
+<!-- Create Room Modal -->
+<div id="cr-modal-overlay" class="cr-modal-overlay" style="display:none;">
+    <div class="cr-modal">
+        <div class="cr-modal-title">Create Chatroom</div>
+        <div id="cr-modal-error" class="cr-error" style="display:none;"></div>
+        <label class="cr-label">Room Name</label>
+        <input type="text" id="cr-new-name" class="cr-input" placeholder="e.g. Study Squad" maxlength="50">
+        <label class="cr-label">Password <span style="opacity:.6;font-size:12px;">(4 digits)</span></label>
+        <input type="text" id="cr-new-pass" class="cr-input" placeholder="e.g. 1234" maxlength="4" inputmode="numeric">
+        <div class="cr-modal-actions">
+            <button class="cr-btn cr-btn-ghost" id="cr-modal-cancel">Cancel</button>
+            <button class="cr-btn cr-btn-primary" id="cr-modal-submit">Create</button>
+        </div>
+    </div>
+</div>
+
+<!-- Join Room Modal (password prompt) -->
+<div id="cr-join-overlay" class="cr-modal-overlay" style="display:none;">
+    <div class="cr-modal">
+        <div class="cr-modal-title">Join <span id="cr-join-room-name"></span></div>
+        <div id="cr-join-error" class="cr-error" style="display:none;"></div>
+        <label class="cr-label">Password <span style="opacity:.6;font-size:12px;">(4 digits)</span></label>
+        <input type="text" id="cr-join-pass" class="cr-input" placeholder="Enter password" maxlength="4"
+            inputmode="numeric">
+        <div class="cr-modal-actions">
+            <button class="cr-btn cr-btn-ghost" id="cr-join-cancel">Cancel</button>
+            <button class="cr-btn cr-btn-primary" id="cr-join-submit">Join</button>
+        </div>
+    </div>
+</div>
+
+
+
+<script>
+    const CSRF = "{{ csrf_token }}";
+
+    // ── Timer countdown ──
+    function formatTime(s) {
+        const m = Math.floor(s / 60);
+        const sec = s % 60;
+        return `${m}:${String(sec).padStart(2, '0')}`;
+    }
+
+    const timerEls = document.querySelectorAll('.cr-room-card');
+    timerEls.forEach(card => {
+        let remaining = parseInt(card.dataset.expires, 10);
+        const roomId = card.dataset.roomId;
+        const valEl = card.querySelector('.cr-timer-val');
+        if (!valEl) return;
+
+        valEl.textContent = formatTime(remaining);
+
+        const iv = setInterval(() => {
+            remaining--;
+            if (remaining <= 0) {
+                clearInterval(iv);
+                card.style.opacity = '.3';
+                valEl.textContent = 'expired';
+                setTimeout(() => card.remove(), 1500);
+            } else {
+                valEl.textContent = formatTime(remaining);
+            }
+        }, 1000);
+    });
+
+    // ── Create Room Modal ──
+    const createBtn = document.getElementById('cr-create-btn');
+    const overlay = document.getElementById('cr-modal-overlay');
+    const cancelBtn = document.getElementById('cr-modal-cancel');
+    const submitBtn = document.getElementById('cr-modal-submit');
+    const modalErr = document.getElementById('cr-modal-error');
+
+    createBtn.addEventListener('click', () => { overlay.style.display = 'flex'; });
+    cancelBtn.addEventListener('click', () => { overlay.style.display = 'none'; modalErr.style.display = 'none'; });
+
+    submitBtn.addEventListener('click', () => {
+        const name = document.getElementById('cr-new-name').value.trim();
+        const pass = document.getElementById('cr-new-pass').value.trim();
+        modalErr.style.display = 'none';
+
+        fetch('/chat/create/', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `name=${encodeURIComponent(name)}&password=${encodeURIComponent(pass)}`
+        })
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) {
+                    modalErr.textContent = data.error;
+                    modalErr.style.display = 'block';
+                    return;
+                }
+                overlay.style.display = 'none';
+                window.location.href = `/chat/room/${data.room_id}/`;
+            });
+    });
+
+    // ── Search ──
+    let searchTimeout;
+    const searchInput = document.getElementById('cr-search-input');
+    const searchResults = document.getElementById('cr-search-results');
+    const searchList = document.getElementById('cr-search-list');
+
+    searchInput.addEventListener('input', () => {
+        clearTimeout(searchTimeout);
+        const q = searchInput.value.trim();
+        if (!q) { searchResults.style.display = 'none'; return; }
+
+        searchTimeout = setTimeout(() => {
+            fetch(`/chat/search/?q=${encodeURIComponent(q)}`)
+                .then(r => r.json())
+                .then(data => {
+                    searchList.innerHTML = '';
+                    if (!data.rooms.length) {
+                        searchList.innerHTML = '<div class="cr-empty">No rooms found.</div>';
+                    } else {
+                        data.rooms.forEach(r => {
+                            const card = document.createElement('div');
+                            card.className = 'cr-room-card';
+                            card.innerHTML = `
+                        <div class="cr-room-info">
+                            <span class="cr-room-name">${r.name}</span>
+                            <span class="cr-room-meta">${r.members} member(s) &bull; ${formatTime(r.seconds_remaining)} left</span>
+                        </div>
+                        <div class="cr-room-right">
+                            ${r.is_member
+                                    ? `<a href="/chat/room/${r.id}/" class="cr-btn cr-btn-enter">Enter</a>`
+                                    : `<button class="cr-btn cr-btn-join" onclick="openJoin(${r.id},'${r.name.replace(/'/g, "\\'")}')">Join</button>`
+                                }
+                        </div>`;
+                            searchList.appendChild(card);
+                        });
+                    }
+                    searchResults.style.display = 'block';
+                });
+        }, 350);
+    });
+
+    // ── Join via password Modal ──
+    const joinOverlay = document.getElementById('cr-join-overlay');
+    const joinRoomNameEl = document.getElementById('cr-join-room-name');
+    const joinCancel = document.getElementById('cr-join-cancel');
+    const joinSubmit = document.getElementById('cr-join-submit');
+    const joinErr = document.getElementById('cr-join-error');
+    let joinRoomId = null;
+
+    function openJoin(id, name) {
+        joinRoomId = id;
+        joinRoomNameEl.textContent = name;
+        document.getElementById('cr-join-pass').value = '';
+        joinErr.style.display = 'none';
+        joinOverlay.style.display = 'flex';
+    }
+
+    joinCancel.addEventListener('click', () => { joinOverlay.style.display = 'none'; });
+
+    joinSubmit.addEventListener('click', () => {
+        const pass = document.getElementById('cr-join-pass').value.trim();
+        joinErr.style.display = 'none';
+
+        fetch(`/chat/room/${joinRoomId}/join/`, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `password=${encodeURIComponent(pass)}`
+        })
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) {
+                    joinErr.textContent = data.error;
+                    joinErr.style.display = 'block';
+                    return;
+                }
+                window.location.href = `/chat/room/${joinRoomId}/`;
+            });
+    });
+</script>
+
+{% endblock %}

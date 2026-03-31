@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+
+{% load static %}
+
+{% block content %}
+
+<h2>Search</h2>
+
+<hr>
+
+{% if results %}
+    <div class="user-grid">
+        {% for user in results %}
+            <div class="user-card">
+                {% if user.profile_photo %}
+                    <img src="{{ user.profile_photo.url }}" alt="{{ user.username }}" class="user-card-photo">
+                {% else %}
+                    <img src="{% static 'images/default_pfp.png' %}" alt="{{ user.username }}" class="user-card-photo">
+                {% endif %}
+                <h3>{{ user.username }}</h3>
+                <a href="/profile/{{ user.username }}/" class="btn btn-card">View Profile</a>
+            </div>
+        {% endfor %}
+    </div>
+{% endif %}
+
+{% endblock %}

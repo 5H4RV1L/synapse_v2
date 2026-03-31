@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% load tz %}
+
+{% block content %}
+
+<h2>Create Post</h2>
+
+<form method="POST" enctype="multipart/form-data">
+    {% csrf_token %}
+
+    <div class="form-group">
+        <label for="id_image" class="file-input-label">Choose Image</label>
+        <input type="file"
+               id="id_image"
+               name="image"
+               accept="image/jpeg,image/png"
+               class="file-input"
+               onchange="previewImage(event)">
+    </div>
+
+    <div id="imagePreviewContainer" style="margin-top:15px; display:none;">
+        <img id="imagePreview"
+             style="max-width:100%; border-radius:10px;">
+    </div>
+
+    <textarea name="content" rows="4"
+              placeholder="What's on your mind?"></textarea><br><br>
+
+    <button type="submit" class="btn">Post</button>
+</form>
+
+<script>
+function previewImage(event) {
+    const input = event.target;
+    const preview = document.getElementById('imagePreview');
+    const container = document.getElementById('imagePreviewContainer');
+
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+
+        reader.onload = function(e) {
+            preview.src = e.target.result;
+            container.style.display = "block";
+        }
+
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+</script>
+
+{% endblock %}
