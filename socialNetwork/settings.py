@@ -42,8 +42,8 @@ SECURE_SSL_REDIRECT = True # Set to True when deploying with HTTPS
 X_FRAME_OPTIONS = 'DENY'
 SECURE_REFERRER_POLICY = 'same-origin'
 
-ALLOWED_HOSTS = ['synapse.sharvil.site', 'www.synapse.sharvil.site' '.onrender.com']
-CSRF_TRUSTED_ORIGINS = ['https://daleyza-glycosidic-noninductively.ngrok-free.dev']
+ALLOWED_HOSTS = ['synapse.sharvil.site', 'www.synapse.sharvil.site', 'synapse-u341.onrender.com']
+CSRF_TRUSTED_ORIGINS = ['https://synapse-u341.onrender.com/', 'http://synapse.sharvil.site/']
 
 
 # Application definition
