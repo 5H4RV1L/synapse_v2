@@ -6,6 +6,7 @@ from django.core.exceptions import ValidationError
 from PIL import Image
 from io import BytesIO
 from django.core.files.base import ContentFile
+from cloudinary.models import CloudinaryField
 
 class User(AbstractUser):
     
@@ -14,11 +15,8 @@ class User(AbstractUser):
         unique=True
     )
     
-    profile_photo = models.ImageField(
-        upload_to='profile_photos/',
-        null=True,
-        blank=True
-    )
+
+    profile_photo = CloudinaryField('image', null=True, blank=True)
     
     THEME_CHOICES = (
         ('dark', 'Cyberpunk Dark'),
@@ -37,16 +35,6 @@ class User(AbstractUser):
     
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
-
-        if self.profile_photo:
-            img = Image.open(self.profile_photo.path)
-
-            if img.mode in ("RGBA", "P"):
-                img = img.convert("RGB")
-
-            img.thumbnail((300, 300))
-
-            img.save(self.profile_photo.path, format='JPEG', quality=70)
 
 class InviteCode(models.Model):
     code = models.CharField(max_length=50, unique=True, editable=False)
