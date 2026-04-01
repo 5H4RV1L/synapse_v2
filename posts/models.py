@@ -1,6 +1,7 @@
 from django.db import models
 from django.conf import settings
 from PIL import Image
+from cloudinary.models import CloudinaryField
 
 class Post(models.Model):
     
@@ -18,11 +19,7 @@ class Post(models.Model):
         related_name='posts'
     )
     
-    image = models.ImageField(
-        upload_to='post_images/',
-        null=True,
-        blank=True
-    )
+    image = CloudinaryField('image', null=True, blank=True)
     
     content = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
@@ -37,15 +34,6 @@ class Post(models.Model):
     
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
-    
-        if self.image:
-            img = Image.open(self.image.path)
-    
-            if img.mode in ("RGBA", "P"):
-                img = img.convert("RGB")
-    
-            img.thumbnail((800, 800))
-            img.save(self.image.path, format='JPEG', quality=75)
 
 
 
