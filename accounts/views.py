@@ -295,7 +295,7 @@ def verify_otp(request):
         otp.is_used = True
         otp.save()
 
-        login(request, user)
+        login(request, user, backend='django.contrib.auth.backends.ModelBackend')
 
         del request.session['verify_email']
 
